@@ -1,5 +1,3 @@
-// API de Series y Episodios
-// Iniciar el servidor: pnpm dev
 
 const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
@@ -9,40 +7,29 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// ----------------------------------------------------------------
-// Ayudantes
-// ----------------------------------------------------------------
-
-// Abre la conexión y devuelve la colección "series" lista para usar.
 async function conectar() {
   const client = new MongoClient(process.env.MONGODB_URI);
   await client.connect();
   const collection = client.db(process.env.MONGODB_DB).collection('series');
   return { client, collection };
 }
-
-// MongoDB guarda "_id", pero la API muestra "id" (como en el ejercicio de cursos).
 function formatearSerie({ _id, ...serie }) {
   return { id: _id.toString(), ...serie };
 }
-
-// Quita los espacios de sobra al inicio y al final (trim).
-// Si no es texto, lo deja igual para que la validación lo atrape.
 function limpiar(valor) {
   return typeof valor === 'string' ? valor.trim() : valor;
 }
 
-// Revisa que sea texto y que no quede vacío después del trim.
+
 function textoValido(valor) {
   return typeof valor === 'string' && valor.length > 0;
 }
 
-// Revisa que sea un número entero mayor que 0.
 function numeroValido(valor) {
   return Number.isInteger(valor) && valor > 0;
 }
 
-// Limpia un episodio (trim a los textos).
+
 function limpiarEpisodio(episodio = {}) {
   return {
     id: limpiar(episodio.id),
@@ -63,7 +50,7 @@ function validarEpisodio(episodio) {
   return null;
 }
 
-// Limpia y revisa los datos de una serie (para POST y PUT).
+// Limpia y revisa los datos de una serie
 // Devuelve { serie } si todo está bien, o { error } con el mensaje.
 function prepararSerie(body = {}) {
   const serie = {
@@ -74,12 +61,12 @@ function prepararSerie(body = {}) {
     episodes: body.episodes === undefined ? [] : body.episodes,
   };
 
-  // Validación 1: el título es obligatorio y no puede ser solo espacios.
+  // Validación 1, el título es obligatorio y no puede ser solo espacios.
   if (!textoValido(serie.title)) return { error: 'El "title" es obligatorio y no puede estar vacío' };
   if (!textoValido(serie.platform)) return { error: 'La "platform" es obligatoria y no puede estar vacía' };
   if (!textoValido(serie.genre)) return { error: 'El "genre" es obligatorio y no puede estar vacío' };
 
-  // Validación 2: las temporadas deben ser un número entero mayor que 0.
+  // Validación 2, las temporadas deben ser un número entero mayor que 0.
   if (!numeroValido(serie.seasons)) return { error: 'Las "seasons" deben ser un número entero mayor que 0' };
 
   if (!Array.isArray(serie.episodes)) return { error: 'Los "episodes" deben ser una lista' };
@@ -91,18 +78,14 @@ function prepararSerie(body = {}) {
     if (error) return { error };
   }
 
-  // Validación 3: no se puede repetir el id de un episodio dentro de la misma serie.
+  // Validación 3, no se puede repetir el id de un episodio dentro de la misma serie.
   const ids = serie.episodes.map((episodio) => episodio.id);
   if (new Set(ids).size !== ids.length) return { error: 'Hay episodios con el "id" repetido' };
 
   return { serie };
 }
 
-// ----------------------------------------------------------------
-// Rutas
-// ----------------------------------------------------------------
-
-// Listar todas las series.
+// Listar.
 app.get('/series', async (req, res) => {
   let client;
   try {
@@ -165,7 +148,7 @@ app.post('/series', async (req, res) => {
   }
 });
 
-// Actualizar una serie completa (reemplaza los datos, el id se queda igual).
+// Actualizar una serie completa.
 app.put('/series/:id', async (req, res) => {
   if (!ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ message: 'El id no tiene un formato válido' });
@@ -197,7 +180,7 @@ app.put('/series/:id', async (req, res) => {
   }
 });
 
-// Eliminar una serie.
+// Eliminarla.
 app.delete('/series/:id', async (req, res) => {
   if (!ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ message: 'El id no tiene un formato válido' });
@@ -221,7 +204,7 @@ app.delete('/series/:id', async (req, res) => {
   }
 });
 
-// Agregar UN episodio a una serie (sin mandar toda la lista).
+// Agregar UN episodio a una serie sin que mande toda la lista.
 app.post('/series/:id/episodes', async (req, res) => {
   if (!ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ message: 'El id no tiene un formato válido' });
@@ -244,12 +227,12 @@ app.post('/series/:id/episodes', async (req, res) => {
       return res.status(404).json({ message: 'No existe una serie con ese id' });
     }
 
-    // Validación 3 también aquí: el id del episodio no se puede repetir.
+    // Validación 3 también aqui, el id del episodio no se puede repetir.
     if (serie.episodes.some((e) => e.id === episodio.id)) {
       return res.status(400).json({ message: 'Ya existe un episodio con ese "id" en esta serie' });
     }
 
-    // $push mete el episodio al final de la lista "episodes".
+    // push mete el episodio al final de la lista episdes.
     await conexion.collection.updateOne(filtro, { $push: { episodes: episodio } });
     res.status(201).json(episodio);
   } catch (err) {
