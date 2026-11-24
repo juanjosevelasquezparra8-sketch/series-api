@@ -105,12 +105,16 @@ Queda disponible en `http://localhost:3000`.
 
 Estos comandos son para Bash (en Windows, usar Git Bash).
 
+El JSON se manda con `--data-binary @- <<'EOF'` en vez de `-d '...'`. Así las tildes y la ñ llegan bien a la API, porque en Windows `-d` las daña antes de que curl las envíe. Se copia y pega todo el bloque, incluida la línea `EOF` del final.
+
 Crear una serie con un episodio:
 
 ```bash
 curl -i -X POST http://localhost:3000/series \
   -H 'Content-Type: application/json' \
-  -d '{"title":"La casa de papel","platform":"Netflix","genre":"Acción","seasons":5,"episodes":[{"id":"ep-1","title":"Efectuar lo acordado","season":1,"number":1,"duration":47}]}'
+  --data-binary @- <<'EOF'
+{"title":"La casa de papel","platform":"Netflix","genre":"Acción","seasons":5,"episodes":[{"id":"ep-1","title":"Efectuar lo acordado","season":1,"number":1,"duration":47}]}
+EOF
 ```
 
 Crear otra serie sin episodios (con ñ en el nombre):
@@ -118,7 +122,9 @@ Crear otra serie sin episodios (con ñ en el nombre):
 ```bash
 curl -i -X POST http://localhost:3000/series \
   -H 'Content-Type: application/json' \
-  -d '{"title":"El señor de los anillos: Los anillos de poder","platform":"Prime Video","genre":"Fantasía","seasons":2}'
+  --data-binary @- <<'EOF'
+{"title":"El señor de los anillos: Los anillos de poder","platform":"Prime Video","genre":"Fantasía","seasons":2}
+EOF
 ```
 
 Listar todas las series:
@@ -144,7 +150,9 @@ Agregar un episodio:
 ```bash
 curl -i -X POST "http://localhost:3000/series/$SERIE_ID/episodes" \
   -H 'Content-Type: application/json' \
-  -d '{"id":"ep-2","title":"Imprudencias letales","season":1,"number":2,"duration":41}'
+  --data-binary @- <<'EOF'
+{"id":"ep-2","title":"Imprudencias letales","season":1,"number":2,"duration":41}
+EOF
 ```
 
 Actualizar la serie:
@@ -152,7 +160,9 @@ Actualizar la serie:
 ```bash
 curl -i -X PUT "http://localhost:3000/series/$SERIE_ID" \
   -H 'Content-Type: application/json' \
-  -d '{"title":"La casa de papel (actualizada)","platform":"Netflix","genre":"Acción","seasons":5,"episodes":[]}'
+  --data-binary @- <<'EOF'
+{"title":"La casa de papel (actualizada)","platform":"Netflix","genre":"Acción","seasons":5,"episodes":[]}
+EOF
 ```
 
 Eliminar la serie:
@@ -168,7 +178,9 @@ Título vacío (responde `400`):
 ```bash
 curl -i -X POST http://localhost:3000/series \
   -H 'Content-Type: application/json' \
-  -d '{"title":"   ","platform":"Netflix","genre":"Drama","seasons":1}'
+  --data-binary @- <<'EOF'
+{"title":"   ","platform":"Netflix","genre":"Drama","seasons":1}
+EOF
 ```
 
 Temporadas en 0 (responde `400`):
@@ -176,7 +188,9 @@ Temporadas en 0 (responde `400`):
 ```bash
 curl -i -X POST http://localhost:3000/series \
   -H 'Content-Type: application/json' \
-  -d '{"title":"Dark","platform":"Netflix","genre":"Misterio","seasons":0}'
+  --data-binary @- <<'EOF'
+{"title":"Dark","platform":"Netflix","genre":"Misterio","seasons":0}
+EOF
 ```
 
 Episodio con `id` repetido (responde `400`):
@@ -184,7 +198,9 @@ Episodio con `id` repetido (responde `400`):
 ```bash
 curl -i -X POST http://localhost:3000/series \
   -H 'Content-Type: application/json' \
-  -d '{"title":"Dark","platform":"Netflix","genre":"Misterio","seasons":3,"episodes":[{"id":"ep-1","title":"Secretos","season":1,"number":1,"duration":51},{"id":"ep-1","title":"Mentiras","season":1,"number":2,"duration":44}]}'
+  --data-binary @- <<'EOF'
+{"title":"Dark","platform":"Netflix","genre":"Misterio","seasons":3,"episodes":[{"id":"ep-1","title":"Secretos","season":1,"number":1,"duration":51},{"id":"ep-1","title":"Mentiras","season":1,"number":2,"duration":44}]}
+EOF
 ```
 
 Ver los datos directamente en MongoDB:
