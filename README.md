@@ -1,277 +1,194 @@
-# CRUD de cursos y estudiantes
+# CRUD de series y episodios
 
-Ejercicio básico de una API JSON con Node.js, Express y pnpm. Completa los `TODO` de `server.cjs`; el scaffold responde `501` hasta implementar cada operación.
+API JSON con Node.js, Express, pnpm y MongoDB. Cada serie guarda sus episodios embebidos dentro del mismo documento (relación 1 a muchos).
 
 ## Modelo de datos
 
-![Diagrama de clases: Course y Student](docs/model.svg)
-
-Un curso contiene un arreglo de estudiantes embebidos. No existe una colección independiente de estudiantes ni endpoints adicionales para ellos. Los cursos se guardan en la colección `courses` de MongoDB. Los estudiantes viven dentro de cada documento de curso.
+Las series se guardan en la colección `series` de MongoDB. Los episodios viven dentro de cada serie, no tienen colección propia.
 
 ```json
 {
   "id": "507f1f77bcf86cd799439011",
-  "name": "Bases de datos II",
-  "description": "Introducción a bases de datos documentales",
-  "students": [
+  "title": "La casa de papel",
+  "platform": "Netflix",
+  "genre": "Acción",
+  "seasons": 5,
+  "episodes": [
     {
-      "id": "student-1",
-      "name": "Ana García",
-      "email": "ana@example.com"
+      "id": "ep-1",
+      "title": "Efectuar lo acordado",
+      "season": 1,
+      "number": 1,
+      "duration": 47
     }
   ]
 }
 ```
 
-- `Course.id`: string no vacío generado a partir del `_id` de MongoDB (`ObjectId`). La API expone `id`, no `_id`. Se conserva al actualizar.
-- `Course.name`: string obligatorio, no vacío ni compuesto solo por espacios.
-- `Course.description`: string obligatorio; puede estar vacío.
-- `Course.students`: arreglo de objetos `Student`. En POST, si se omite, se guarda como `[]`.
-- Cada estudiante lleva `id`, `name` y `email` como strings no vacíos. El cliente proporciona estos tres campos. Para este ejercicio no se exige validar el formato del email ni relaciones entre cursos.
+- `id`: se genera a partir del `_id` de MongoDB. La API muestra `id`, no `_id`.
+- `title`, `platform`, `genre`: texto obligatorio.
+- `seasons`: número entero mayor que 0.
+- `episodes`: lista de episodios. Si no se envía en el POST, se guarda como `[]`.
+- Cada episodio lleva `id` y `title` (texto) y `season`, `number` y `duration` (enteros mayores que 0). `duration` va en minutos.
 
-## Contrato de la API
+## Validaciones
 
-Envía `Content-Type: application/json` en POST y PUT. Las respuestas tienen contenido JSON, excepto el DELETE exitoso, que no lleva cuerpo.
+1. `title`, `platform` y `genre` no pueden estar vacíos ni ser solo espacios.
+2. `seasons` y los números de cada episodio deben ser enteros mayores que 0.
+3. No se puede repetir el `id` de un episodio dentro de la misma serie.
 
-| Método | Ruta | Resultado esperado |
+A todos los textos se les hace `trim` (se quitan los espacios del inicio y del final). Se aceptan tildes y ñ.
+
+Si algo no cumple, la API responde `400` con `{ "message": "..." }` explicando el error.
+
+## Endpoints
+
+| Método | Ruta | Resultado |
 | --- | --- | --- |
-| GET | `/courses` | `200`: arreglo de cursos; inicialmente `[]` |
-| GET | `/courses/:id` | `200`: objeto curso; `404` si no existe |
-| POST | `/courses` | `201`: curso creado con su ID y sus estudiantes |
-| PUT | `/courses/:id` | `200`: curso actualizado; `404` si no existe |
-| DELETE | `/courses/:id` | `204`: sin cuerpo; `404` si no existe |
+| GET | `/series` | `200`: lista de series |
+| GET | `/series/:id` | `200`: la serie; `404` si no existe |
+| POST | `/series` | `201`: serie creada; `400` si los datos no son válidos |
+| PUT | `/series/:id` | `200`: serie actualizada; `400` o `404` |
+| DELETE | `/series/:id` | `204`: sin cuerpo; `404` si no existe |
+| POST | `/series/:id/episodes` | `201`: agrega un episodio a la serie; `400` o `404` |
 
-POST recibe `name`, `description` y opcionalmente `students`. PUT recibe `name`, `description` y `students`, y reemplaza esos tres campos manteniendo el ID. Para agregar, modificar o eliminar estudiantes, envía el arreglo completo actualizado mediante PUT.
+PUT reemplaza todos los datos de la serie (incluida la lista de episodios) y mantiene el mismo `id`. Para agregar un solo episodio sin mandar toda la lista, se usa `POST /series/:id/episodes`.
 
-Para esta práctica, POST y PUT asumen que reciben datos con el formato del ejemplo; no se exigen validaciones de entrada. Los errores `404` devuelven un objeto JSON `{ "message": "Explicación del error" }`. El texto del mensaje es libre, pero no debe estar vacío.
+## Cómo correrlo
 
-## 1. Requisitos
+### 1. Requisitos
 
-Versiones base para este ejercicio:
+- Node.js 22.21 o superior
+- pnpm 10 o superior
+- Docker Desktop con el motor iniciado
+- Puertos 27017 (MongoDB) y 3000 (API) libres
 
-- Node.js **22.21 o superior**.
-- pnpm **10 o superior**.
-- Docker Engine **24 o superior**, o Docker Desktop con el motor iniciado.
-- Puerto **27017** libre para MongoDB y **3000** para la API.
-- Git para clonar el repositorio.
-- curl y, opcionalmente, Bruno para enviar solicitudes.
-
-```bash
-node --version
-pnpm --version
-docker version
-```
-
-Clona el repositorio, entra al directorio e instala las dependencias:
+### 2. Clonar e instalar
 
 ```bash
-git clone https://github.com/elfotografo007/ucp-bd2-template-2026-2.git
-cd ucp-bd2-template-2026-2
+git clone https://github.com/juanjosevelasquezparra8-sketch/series-api.git
+cd series-api
 pnpm install
 ```
 
-A partir de aquí, los comandos se ejecutan desde la raíz del proyecto. Los ejemplos de terminal usan Bash o Zsh.
-
-## 2. Lanzar MongoDB Community en Docker
+### 3. Lanzar MongoDB en Docker
 
 ```bash
-docker run --detach \
-  --name ucp-mongo \
-  --publish 127.0.0.1:27017:27017 \
-  --volume ucp-mongo-data:/data/db \
-  mongodb/mongodb-community-server:9.0.4-ubuntu2204
+docker run --detach --name ucp-mongo --publish 127.0.0.1:27017:27017 --volume ucp-mongo-data:/data/db mongodb/mongodb-community-server:9.0.4-ubuntu2204
 ```
 
-Usamos la imagen de MongoDB `mongodb/mongodb-community-server:9.0.4-ubuntu2204`.
+Si el contenedor ya existe, solo se prende con `docker start ucp-mongo`.
 
-El puerto 27017 del contenedor queda disponible en el 27017 de tu máquina. El volumen conserva los datos entre reinicios. Este entorno de práctica no usa autenticación y solo se publica en la interfaz local.
-
-Comprueba que esté listo:
-
-```bash
-docker logs ucp-mongo
-docker exec ucp-mongo mongosh --quiet --eval 'db.runCommand({ ping: 1 })'
-```
-
-El ping debe mostrar `ok: 1`. Para sesiones posteriores usa `docker stop ucp-mongo` y `docker start ucp-mongo`; no repitas `docker run` si el contenedor ya existe. Si otro MongoDB ocupa el puerto, reutiliza ese servicio local o libera el puerto antes de crear este contenedor.
-
-## 3. Instalar el driver oficial
-
-```bash
-pnpm add mongodb
-```
-
-Usaremos el driver oficial `mongodb`, sin Mongoose. Ya está registrado en las dependencias del template; el comando muestra cómo agregarlo en un proyecto nuevo.
-
-## 4. Configurar la conexión local
+### 4. Configurar el `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Contenido de `.env`:
+Y dejarlo así:
 
 ```dotenv
 MONGODB_URI=mongodb://127.0.0.1:27017
-MONGODB_DB=ucp_courses
+MONGODB_DB=ucp_series
 PORT=3000
 ```
 
-`.env` está ignorado por Git. Los scripts `pnpm dev`, `pnpm start` y `pnpm test` cargan estas variables con la opción nativa de Node `--env-file-if-exists=.env`, sin necesitar `dotenv`. La API corre en tu máquina y se conecta al puerto publicado por Docker.
-
-## 5. Conectar Express a MongoDB
-
-**Los siguientes bloques son código para que incorpores a `server.cjs`.** El scaffold mantiene sus `TODO`; la guía resuelve listar y crear, y deja las otras tres operaciones como ejercicio.
-
-Agrega junto a los imports:
-
-```js
-const { MongoClient, ObjectId } = require('mongodb');
-```
-
-## 6. Listar cursos sin paginación
-
-Reemplaza el handler de `GET /courses`:
-
-```js
-app.get('/courses', async (req, res) => {
-  const client = new MongoClient(process.env.MONGODB_URI);
-
-  try {
-    await client.connect();
-    const db = client.db(process.env.MONGODB_DB);
-    const collection = db.collection('courses');
-
-    const documents = await collection.find({}).toArray();
-    const courses = documents.map(({ _id, ...course }) => ({
-      id: _id.toString(),
-      ...course,
-    }));
-    res.status(200).json(courses);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'No se pudieron listar los cursos' });
-  } finally {
-    await client.close();
-  }
-});
-```
-
-`find({})` consulta todos los documentos y `toArray()` los convierte en un arreglo. No usamos filtros, límite ni paginación en este ejercicio.
-
-## 7. Crear un curso con estudiantes embebidos
-
-Reemplaza el handler de `POST /courses`:
-
-```js
-app.post('/courses', async (req, res) => {
-  const { name, description, students = [] } = req.body || {};
-  const course = { name, description, students };
-
-  const client = new MongoClient(process.env.MONGODB_URI);
-
-  try {
-    await client.connect();
-    const db = client.db(process.env.MONGODB_DB);
-    const collection = db.collection('courses');
-
-    const result = await collection.insertOne(course);
-    res.status(201).json({
-      id: result.insertedId.toString(),
-      name: course.name,
-      description: course.description,
-      students: course.students,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'No se pudo crear el curso' });
-  } finally {
-    await client.close();
-  }
-});
-```
-
-`insertOne` guarda el curso y genera su `_id`. Omitir `students` equivale a enviar `[]`. Por ahora no validamos los datos de entrada en este endpoint.
-
-Inicia la API después de aplicar los bloques:
+### 5. Iniciar la API
 
 ```bash
 pnpm dev
 ```
 
-## 8. Crear datos de ejemplo con curl
+Queda disponible en `http://localhost:3000`.
 
-Crear un curso con una estudiante:
+## Probar con curl
+
+Estos comandos son para Bash (en Windows, usar Git Bash).
+
+Crear una serie con un episodio:
 
 ```bash
-curl -i -X POST http://localhost:3000/courses \
+curl -i -X POST http://localhost:3000/series \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Bases de datos II","description":"Bases documentales","students":[{"id":"student-1","name":"Ana García","email":"ana@example.com"}]}'
+  -d '{"title":"La casa de papel","platform":"Netflix","genre":"Acción","seasons":5,"episodes":[{"id":"ep-1","title":"Efectuar lo acordado","season":1,"number":1,"duration":47}]}'
 ```
 
-Crear otro curso sin estudiantes y listar ambos:
+Crear otra serie sin episodios (con ñ en el nombre):
 
 ```bash
-curl -i -X POST http://localhost:3000/courses \
+curl -i -X POST http://localhost:3000/series \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Programación web","description":"API con Express"}'
-
-curl -i http://localhost:3000/courses
+  -d '{"title":"El señor de los anillos: Los anillos de poder","platform":"Prime Video","genre":"Fantasía","seasons":2}'
 ```
 
-Copia el `id` que devuelve POST para las operaciones que implementarás después:
+Listar todas las series:
 
 ```bash
-COURSE_ID='pega-aqui-el-id-devuelto'
-curl -i "http://localhost:3000/courses/$COURSE_ID"
+curl -i http://localhost:3000/series
+```
 
-curl -i -X PUT "http://localhost:3000/courses/$COURSE_ID" \
+Copiar el `id` que devolvió el POST y guardarlo:
+
+```bash
+SERIE_ID='pega-aqui-el-id'
+```
+
+Consultar una serie:
+
+```bash
+curl -i "http://localhost:3000/series/$SERIE_ID"
+```
+
+Agregar un episodio:
+
+```bash
+curl -i -X POST "http://localhost:3000/series/$SERIE_ID/episodes" \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Bases de datos II actualizado","description":"CRUD con MongoDB","students":[]}'
-
-curl -i -X DELETE "http://localhost:3000/courses/$COURSE_ID"
+  -d '{"id":"ep-2","title":"Imprudencias letales","season":1,"number":2,"duration":41}'
 ```
 
-Estas tres últimas rutas todavía responderán `501` hasta que las completes. Para consultar directamente los documentos guardados:
+Actualizar la serie:
 
 ```bash
-docker exec ucp-mongo mongosh ucp_courses --quiet --eval 'db.courses.find().toArray()'
+curl -i -X PUT "http://localhost:3000/series/$SERIE_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"La casa de papel (actualizada)","platform":"Netflix","genre":"Acción","seasons":5,"episodes":[]}'
 ```
 
-## 9. Probar todos los endpoints con Bruno
-
-Descarga e instala [Bruno](https://www.usebruno.com/downloads).
-
-1. Abre Bruno y selecciona **Open Collection**.
-2. Abre la carpeta [`bruno`](bruno) de este repositorio.
-3. Selecciona el entorno **Local** (`baseUrl = http://localhost:3000`).
-4. Ejecuta **01 Crear curso**. Su script guarda automáticamente el `id` en la variable de ejecución `courseId` cuando recibe `201`.
-5. Ejecuta listar, consultar, actualizar y eliminar en ese orden. Las solicitudes usan `{{baseUrl}}` y `{{courseId}}`.
-6. Para trabajar con otro curso, crea uno nuevo o copia su ID en `courseId` del entorno y limpia la variable de ejecución anterior en Bruno. Al reiniciar Bruno puedes volver a ejecutar Crear.
-
-PUT incluye un estudiante modificado. Cambia `students` a `[]` para practicar su eliminación. DELETE elimina el curso seleccionado; vuelve a crear uno para repetir el recorrido. Cada solicitud incluye una comprobación básica del estado HTTP esperado.
-
-## 10. Completar el ejercicio y ejecutar las pruebas
-
-Implementa consultar por ID, actualizar y eliminar usando `findOne`, `updateOne` (con `$set`) y `deleteOne`. Importa `ObjectId` desde `mongodb` para buscar por `{ _id: new ObjectId(req.params.id) }`. Para este ejercicio asumimos IDs con formato válido. Responde `404` cuando el curso no exista. No modifiques `_id` en PUT. Devuelve `id` como string en todas las respuestas de cursos.
+Eliminar la serie:
 
 ```bash
-pnpm test
+curl -i -X DELETE "http://localhost:3000/series/$SERIE_ID"
 ```
 
-Las pruebas de listado y consulta por ID insertan documentos directamente en MongoDB y comparan la respuesta completa, incluidos el `id` como string y los estudiantes embebidos, sin depender de POST.
+### Probar las validaciones
 
-Las 11 pruebas usan `node:test`, Supertest y MongoDB real. No necesitas iniciar la API aparte, pero MongoDB debe estar funcionando. Cada ejecución crea una base temporal `ucp_courses_test_<UUID>`, vacía solo su colección antes de cada caso y elimina esa base al terminar. Durante las pruebas, `MONGODB_DB` apunta a esa base temporal y `MONGODB_URI` al servidor de pruebas. Al terminar se restauran ambas variables; no se borra la base del ejercicio. Si necesitas otro servidor para pruebas, configura `MONGODB_TEST_URI`; de lo contrario se usa `MONGODB_URI` o la conexión local.
+Título vacío (responde `400`):
 
-Conserva `module.exports = app` y el arranque dentro de `require.main === module`. En cada endpoint usa `process.env.MONGODB_URI` y `process.env.MONGODB_DB`, como en los ejemplos, para que las pruebas puedan elegir su base temporal. Cierra siempre la conexión en `finally`.
+```bash
+curl -i -X POST http://localhost:3000/series \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"   ","platform":"Netflix","genre":"Drama","seasons":1}'
+```
 
-**Las pruebas fallan al inicio por las respuestas `501`.** Tras copiar los ejemplos de listar y crear pasarán los casos correspondientes; los demás requieren completar el CRUD. Si MongoDB no está disponible, primero corrige la conexión: ese error de infraestructura no es un fallo de la lógica CRUD.
+Temporadas en 0 (responde `400`):
 
-## Referencias
+```bash
+curl -i -X POST http://localhost:3000/series \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Dark","platform":"Netflix","genre":"Misterio","seasons":0}'
+```
 
-- [Express 5: instalación (español)](https://expressjs.com/es/5x/starter/installing/)
-- [Imagen oficial de MongoDB Community en Docker](https://hub.docker.com/r/mongodb/mongodb-community-server/tags)
-- [MongoDB: insertar documentos con el driver de Node.js (español)](https://www.mongodb.com/es/docs/drivers/node/current/crud/insert/)
-- [MongoDB: referencia rápida del driver de Node.js (español)](https://www.mongodb.com/es/docs/drivers/node/current/reference/quick-reference/)
-- [Node.js: carga nativa de archivos de entorno](https://nodejs.org/api/cli.html#--env-file-if-existsfile)
-- [Variables de Bruno](https://blog.usebruno.com/manage-variables)
+Episodio con `id` repetido (responde `400`):
+
+```bash
+curl -i -X POST http://localhost:3000/series \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Dark","platform":"Netflix","genre":"Misterio","seasons":3,"episodes":[{"id":"ep-1","title":"Secretos","season":1,"number":1,"duration":51},{"id":"ep-1","title":"Mentiras","season":1,"number":2,"duration":44}]}'
+```
+
+Ver los datos directamente en MongoDB:
+
+```bash
+docker exec ucp-mongo mongosh ucp_series --quiet --eval 'db.series.find().toArray()'
+```
